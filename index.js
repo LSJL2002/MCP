@@ -4,7 +4,7 @@ import { z } from "zod";
 
 const server = new McpServer({
   name: "korean-recipe-server",
-  version: "2.0.0"
+  version: "3.0.0"
 });
 
 const userIngredients = new Map();
@@ -30,7 +30,7 @@ server.tool(
   }
 );
 
-// Helper: Translate recipe content
+// Translate helper
 function translate(recipe, lang) {
   if (lang === "en") {
     return {
@@ -38,9 +38,9 @@ function translate(recipe, lang) {
             recipe.name === "계란볶음밥" ? "Egg Fried Rice" : recipe.name,
       ingredients: recipe.ingredients,
       time: recipe.time.includes("분") ? recipe.time.replace("분", " min") : recipe.time,
-      difficulty: recipe.difficulty === "쉬움" ? "Easy" :
-                  recipe.difficulty === "보통" ? "Medium" :
-                  recipe.difficulty === "어려움" ? "Hard" : recipe.difficulty,
+      difficulty: recipe.difficulty === "쉬움" ? "1" :
+                  recipe.difficulty === "보통" ? "3" :
+                  recipe.difficulty === "어려움" ? "5" : recipe.difficulty,
       steps: recipe.steps
     };
   } else {
@@ -48,7 +48,7 @@ function translate(recipe, lang) {
   }
 }
 
-// Tool: Input Ingredients + Claude integration
+// Tool: Input Ingredients
 server.tool(
   "input_ingredients",
   { ingredients: z.array(z.string()) },
@@ -59,68 +59,72 @@ server.tool(
     const response = await ctx.runModel({
       name: "claude-3-opus",
       prompt: `
-You are a Korean recipe expert. Based on the following ingredients:
+You are a Korean cooking expert.
+
+Based on the following ingredients:
 
 ${ingredients.join(", ")}
 
-Suggest one Korean dish that can be made with them. Return:
-- Name of the dish
-- List of required ingredients
-- Time needed (in minutes)
-- Difficulty (Easy, Medium, Hard)
-- Cooking steps
+Suggest 3 Korean dishes that can be made with them. For each recipe, return:
+
+- name
+- ingredients
+- time (in minutes)
+- difficulty (1 to 5, where 1 = Easy and 5 = Hard)
+- steps (as a list)
 
 Respond in ${lang === "ko" ? "Korean" : "English"}.
 
-Format it as JSON:
-{
-  "name": "",
-  "ingredients": [],
-  "time": "",
-  "difficulty": "",
-  "steps": []
-}
-`
+Format:
+[
+  {
+    "name": "",
+    "ingredients": [],
+    "time": "",
+    "difficulty": 1,
+    "steps": []
+  },
+  ...
+]
+      `
     });
 
-    let recipe;
+    let recipes;
     try {
-      recipe = JSON.parse(response.text);
+      recipes = JSON.parse(response.text);
     } catch (e) {
       return {
-        content: [
-          {
-            type: "text",
-            text: lang === "ko"
-              ? "❌ 레시피 생성에 실패했습니다. 다시 시도해주세요."
-              : "❌ Failed to generate a recipe. Please try again."
-          }
-        ]
+        content: [{
+          type: "text",
+          text: lang === "ko"
+            ? "❌ 레시피 분석에 실패했습니다. 다시 시도해주세요."
+            : "❌ Failed to parse the recipe. Please try again."
+        }]
       };
     }
 
-    selectedRecipe.set(ctx.sessionId, JSON.stringify([recipe]));
-    const tr = translate(recipe, lang);
+    selectedRecipe.set(ctx.sessionId, JSON.stringify(recipes));
 
     return {
-      content: [
-        { type: "text", text: `✅ ${lang === "ko" ? "추천 요리" : "Suggested recipe"}: ${tr.name}` },
-        { type: "text", text: `${lang === "ko" ? "재료" : "Ingredients"}: ${tr.ingredients.join(", ")}` },
-        { type: "text", text: `${lang === "ko" ? "조리 시간" : "Cooking time"}: ${tr.time}` },
-        { type: "text", text: `${lang === "ko" ? "난이도" : "Difficulty"}: ${tr.difficulty}` },
-        {
+      content: recipes.map((r, i) => {
+        const tr = translate(r, lang);
+        return {
           type: "text",
-          text: `${lang === "ko" ? "조리법" : "Instructions"}:\n` +
-                tr.steps.map((s, i) => `${i + 1}. ${s}`).join("\n")
-        }
-      ]
+          text:
+            `🍽️ [${i + 1}] ${tr.name}\n` +
+            `${lang === "ko" ? "재료" : "Ingredients"}: ${tr.ingredients.join(", ")}\n` +
+            `${lang === "ko" ? "시간" : "Time"}: ${tr.time}\n` +
+            `${lang === "ko" ? "난이도" : "Difficulty"}: ${tr.difficulty}/5\n` +
+            `${lang === "ko" ? "조리법" : "Steps"}:\n${tr.steps.map((s, j) => `${j + 1}. ${s}`).join("\n")}`
+        };
+      })
     };
   }
 );
 
-// Tool: Select Recipe (Still needed in case you allow multiple later)
+// Tool: Select Recipe
 server.tool(
-  "select_recipe",
+  "recipe_rec",
   { choice: z.number() },
   async ({ choice }, ctx) => {
     const lang = languageSettings.get(ctx.sessionId) || "ko";
@@ -158,7 +162,7 @@ server.tool(
         { type: "text", text: `✅ ${lang === "ko" ? "선택된 요리" : "Selected recipe"}: ${tr.name}` },
         { type: "text", text: `${lang === "ko" ? "필요한 재료" : "Ingredients"}: ${tr.ingredients.join(", ")}` },
         { type: "text", text: `${lang === "ko" ? "조리 시간" : "Cooking time"}: ${tr.time}` },
-        { type: "text", text: `${lang === "ko" ? "난이도" : "Difficulty"}: ${tr.difficulty}` },
+        { type: "text", text: `${lang === "ko" ? "난이도" : "Difficulty"}: ${tr.difficulty}/5` },
         {
           type: "text",
           text: `${lang === "ko" ? "조리법" : "Instructions"}:\n` +
@@ -169,6 +173,6 @@ server.tool(
   }
 );
 
-// Connect to stdio
+// Connect
 const transport = new StdioServerTransport();
 await server.connect(transport);

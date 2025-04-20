@@ -1,0 +1,26 @@
+{
+  "name": "mcp",
+  "version": "1.0.0",
+  "description": "Recipe Generator based on requirements",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LSJL2002/MCP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/LSJL2002/MCP/issues"
+  },
+  "homepage": "https://github.com/LSJL2002/MCP#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.1",
+    "typescript": "^5.8.3",
+    "zod": "^3.24.3"
+  }
+}

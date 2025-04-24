@@ -1,3 +1,6 @@
+import fs from "fs";
+import path from "path";
+import os from "os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -9,10 +12,8 @@ const server = new McpServer({
 });
 
 const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
-
-// Session-scoped storage
 const languageSettings = new Map();
-const recipeCache = new Map(); // Store parsed recipes by sessionId
+const recipeCache = new Map();
 
 async function generateWithCohere(ingredients, lang) {
   const prompt = `
@@ -100,7 +101,6 @@ server.tool(
       };
     }
 
-    // Save for later expansion
     recipeCache.set(ctx.sessionId, parsed);
 
     const formattedRecipes = parsed.map((r, idx) => {
@@ -118,7 +118,7 @@ server.tool(
         },
         {
           type: "text",
-          text: formattedRecipes + "\n\n(Use `expand_recipe` tool to view full steps!)"
+          text: formattedRecipes + "\n\n(Use `expand_recipe` or `save_recipe` tool for more!)"
         }
       ]
     };
@@ -156,6 +156,56 @@ server.tool(
         }
       ]
     };
+  }
+);
+
+// Save recipe tool
+server.tool(
+  "save_recipe",
+  { index: z.enum(["1", "2", "3"]) },
+  async ({ index }, ctx) => {
+    const recipes = recipeCache.get(ctx.sessionId);
+    if (!recipes) {
+      return {
+        content: [{ type: "text", text: "❌ No recipe data to save. Please input ingredients first." }]
+      };
+    }
+
+    const idx = parseInt(index, 10) - 1;
+    const recipe = recipes[idx];
+
+    if (!recipe) {
+      return {
+        content: [{ type: "text", text: "❌ Invalid recipe number." }]
+      };
+    }
+
+    const desktopPath = path.join(os.homedir(), "Desktop");
+    const fileName = `${recipe.name.replace(/\s+/g, "_")}.txt`;
+    const filePath = path.join(desktopPath, fileName);
+
+    const fileContent =
+      `Ingredients:\n` +
+      recipe.ingredients.map(i => `- ${i}`).join("\n") +
+      `\n\nSteps:\n` +
+      recipe.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
+
+    try {
+      fs.writeFileSync(filePath, fileContent);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `✅ "${recipe.name}" has been saved to your Desktop as "${fileName}".`
+          }
+        ]
+      };
+    } catch (err) {
+      console.error("❌ File write failed:", err);
+      return {
+        content: [{ type: "text", text: "❌ Failed to save file." }]
+      };
+    }
   }
 );
 

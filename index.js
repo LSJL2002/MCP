@@ -2,17 +2,45 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+// Initialize the MCP server
 const server = new McpServer({
   name: "korean-recipe-server",
   version: "3.0.0"
 });
 
-// 🔐 Replace with your actual API key
+// 🔐 Replace with your actual Cohere API key
 const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
 
+// Track language per session
 const languageSettings = new Map();
 
-async function callCohere(prompt) {
+// Function to call Cohere API
+async function generateWithCohere(ingredients, lang) {
+  const prompt = `
+You are a Korean cooking expert.
+
+Based on these ingredients: ${ingredients.join(", ")}
+
+Suggest 3 Korean recipes. For each, return:
+- name
+- ingredients
+- time (in minutes)
+- difficulty (1–5)
+- steps
+
+Respond in ${lang === "ko" ? "Korean" : "English"}.
+Respond only in valid JSON format like:
+[
+  {
+    "name": "...",
+    "ingredients": [...],
+    "time": "...",
+    "difficulty": ...,
+    "steps": [...]
+  }
+]
+`;
+
   try {
     const res = await fetch("https://api.cohere.ai/v1/chat", {
       method: "POST",
@@ -42,34 +70,6 @@ async function callCohere(prompt) {
   }
 }
 
-async function generateWithCohere(ingredients, lang) {
-  const prompt = `
-You are a Korean cooking expert.
-
-Based on these ingredients: ${ingredients.join(", ")}
-
-Suggest 3 Korean recipes. For each, return:
-- name
-- ingredients
-- time (in minutes)
-- difficulty (1–5)
-- steps
-
-Respond in ${lang === "ko" ? "Korean" : "English"}.
-Respond only in valid JSON format like:
-[
-  {
-    "name": "...",
-    "ingredients": [...],
-    "time": "...",
-    "difficulty": ...,
-    "steps": [...]
-  }
-]
-`;
-  return await callCohere(prompt);
-}
-
 // Tool: Set Language
 server.tool(
   "set_language",
@@ -95,48 +95,37 @@ server.tool(
   { ingredients: z.array(z.string()) },
   async ({ ingredients }, ctx) => {
     const lang = languageSettings.get(ctx.sessionId) || "ko";
-    const result = await generateWithCohere(ingredients, lang);
+    const raw = await generateWithCohere(ingredients, lang);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      console.error("❌ JSON parsing error:", err);
+      return {
+        content: [{ type: "text", text: "❌ 생성된 응답이 JSON 형식이 아닙니다." }]
+      };
+    }
+
+    const formattedRecipes = parsed.map((r, idx) => {
+      return `🍲 레시피 ${idx + 1}: ${r.name}\n` +
+        `🛒 재료: ${r.ingredients.join(", ")}\n` +
+        `⏱️ 시간: ${r.time} / 난이도: ${r.difficulty}\n` +
+        `📋 단계:\n${r.steps.map((step, i) => `  ${i + 1}. ${step}`).join("\n")}\n`;
+    }).join("\n\n");
 
     return {
-      content: [{
-        type: "text",
-        text: lang === "ko"
-          ? `🍽️ 추천된 레시피:\n${result}`
-          : `🍽️ Recommended Recipes:\n${result}`
-      }]
-    };
-  }
-);
-
-// 🔍 Tool: Expand Steps for a Chosen Recipe
-server.tool(
-  "expand_recipe_steps",
-  {
-    name: z.string(),
-    steps: z.array(z.string())
-  },
-  async ({ name, steps }, ctx) => {
-    const lang = languageSettings.get(ctx.sessionId) || "ko";
-    const prompt = `
-You are a Korean cooking expert.
-
-A user selected the recipe "${name}". These are the current steps:
-${steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}
-
-Please rewrite and expand them into more detailed cooking instructions, one step per item.
-Respond in ${lang === "ko" ? "Korean" : "English"}.
-Only return a numbered list of improved steps.
-`;
-
-    const detailed = await callCohere(prompt);
-
-    return {
-      content: [{
-        type: "text",
-        text: lang === "ko"
-          ? `👩‍🍳 자세한 조리 단계:\n${detailed}`
-          : `👩‍🍳 Detailed Cooking Steps:\n${detailed}`
-      }]
+      content: [
+        {
+          type: "text",
+          text: "Here are the 3 full recipes (in JSON format):\n\n" +
+            JSON.stringify(parsed, null, 2)
+        },
+        {
+          type: "text",
+          text: formattedRecipes
+        }
+      ]
     };
   }
 );

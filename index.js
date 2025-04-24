@@ -8,13 +8,12 @@ const server = new McpServer({
   version: "3.0.0"
 });
 
-// 🔐 Replace with your actual Cohere API key
 const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
 
-// Track language per session
+// Session-scoped storage
 const languageSettings = new Map();
+const recipeCache = new Map(); // Store parsed recipes by sessionId
 
-// Function to call Cohere API
 async function generateWithCohere(ingredients, lang) {
   const prompt = `
 You are a Korean cooking expert.
@@ -57,12 +56,6 @@ Respond only in valid JSON format like:
     });
 
     const data = await res.json();
-
-    if (!data.text && !data.generations) {
-      console.error("❌ Cohere API error:\n", data);
-      return "❌ Cohere API returned no text. Check the logs for error.";
-    }
-
     return data.text || data.generations?.[0]?.text || "❌ No valid response from Cohere.";
   } catch (err) {
     console.error("❌ Cohere request failed:\n", err);
@@ -70,7 +63,7 @@ Respond only in valid JSON format like:
   }
 }
 
-// Tool: Set Language
+// Set language tool
 server.tool(
   "set_language",
   { lang: z.enum(["ko", "en"]) },
@@ -89,7 +82,7 @@ server.tool(
   }
 );
 
-// Tool: Input Ingredients + Generate Recipes
+// Input ingredients tool
 server.tool(
   "input_ingredients",
   { ingredients: z.array(z.string()) },
@@ -107,11 +100,13 @@ server.tool(
       };
     }
 
+    // Save for later expansion
+    recipeCache.set(ctx.sessionId, parsed);
+
     const formattedRecipes = parsed.map((r, idx) => {
       return `🍲 레시피 ${idx + 1}: ${r.name}\n` +
         `🛒 재료: ${r.ingredients.join(", ")}\n` +
-        `⏱️ 시간: ${r.time} / 난이도: ${r.difficulty}\n` +
-        `📋 단계:\n${r.steps.map((step, i) => `  ${i + 1}. ${step}`).join("\n")}\n`;
+        `⏱️ 시간: ${r.time} / 난이도: ${r.difficulty}\n`;
     }).join("\n\n");
 
     return {
@@ -123,7 +118,41 @@ server.tool(
         },
         {
           type: "text",
-          text: formattedRecipes
+          text: formattedRecipes + "\n\n(Use `expand_recipe` tool to view full steps!)"
+        }
+      ]
+    };
+  }
+);
+
+// Expand recipe tool
+server.tool(
+  "expand_recipe",
+  { index: z.enum(["1", "2", "3"]) },
+  async ({ index }, ctx) => {
+    const recipes = recipeCache.get(ctx.sessionId);
+    if (!recipes) {
+      return {
+        content: [{ type: "text", text: "❌ No recipe data available. Please input ingredients first." }]
+      };
+    }
+
+    const idx = parseInt(index, 10) - 1;
+    const recipe = recipes[idx];
+
+    if (!recipe) {
+      return {
+        content: [{ type: "text", text: "❌ Invalid recipe number." }]
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text:
+            `📋 Steps for "${recipe.name}":\n\n` +
+            recipe.steps.map((s, i) => `  ${i + 1}. ${s}`).join("\n")
         }
       ]
     };

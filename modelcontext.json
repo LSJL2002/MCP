@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+      "Recipe": {
+        "command": "node",
+        "args": [
+            "\\Users\\PC\\Desktop\\Coding\\3학년 1학기\\OSS\\midterms\\MCP\\index.js"
+        ]
+      }
+    }
+  }
+  

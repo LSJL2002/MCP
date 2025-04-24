@@ -14,9 +14,15 @@ const server = new McpServer({
 
 const languageSettings = new Map();
 
-// 🔧 Gemini API Helper (with Claude log support)
-async function generateWithGemini(ingredients, lang) {
-  const apiKey = process.env.GEMINI_API_KEY;
+// 🔧 Cohere API Helper
+async function generateWithCohere(ingredients, lang) {
+  const apiKey = process.env.COHERE_API_KEY;
+
+  if (!apiKey) {
+    console.error("❌ Missing COHERE_API_KEY in environment variables.");
+    return "❌ Cohere API key not found.";
+  }
+
   const prompt = `
 You are a Korean cooking expert.
 
@@ -43,25 +49,31 @@ Respond only in valid JSON format like:
 `;
 
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+    const res = await fetch("https://api.cohere.ai/v1/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
+        model: "command-r-plus",
+        message: prompt,
+        temperature: 0.7,
+        max_tokens: 1000
       })
     });
 
     const data = await res.json();
 
-    if (!data.candidates) {
-      console.error("❌ Gemini API error response:\n" + JSON.stringify(data, null, 2));
-      return "❌ Gemini API returned no candidates. Check Claude logs for error.";
+    if (!data.text && !data.generations) {
+      console.error("❌ Cohere API error:\n", data);
+      return "❌ Cohere API returned no text. Check the logs for error.";
     }
 
-    return data.candidates[0].content.parts[0].text;
+    return data.text || data.generations?.[0]?.text || "❌ No valid response from Cohere.";
   } catch (err) {
-    console.error("❌ Gemini request failed:\n", err);
-    return "❌ Gemini API request failed.";
+    console.error("❌ Cohere request failed:\n", err);
+    return "❌ Cohere API request failed.";
   }
 }
 
@@ -102,7 +114,7 @@ server.tool(
   }
 );
 
-// Tool: Recipe Recommendation (calls Gemini)
+// Tool: Recipe Recommendation (calls Cohere)
 server.tool(
   "recipe_rec",
   {},
@@ -125,7 +137,7 @@ server.tool(
     }
 
     const { ingredients } = fileData;
-    const result = await generateWithGemini(ingredients, lang);
+    const result = await generateWithCohere(ingredients, lang);
 
     return {
       content: [{

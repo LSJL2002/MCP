@@ -3,26 +3,18 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "fs/promises";
 import path from "path";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const server = new McpServer({
   name: "korean-recipe-server",
   version: "3.0.0"
 });
 
+// 🔐 Hardcoded API key (replace with your actual key)
+const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
+
 const languageSettings = new Map();
 
-// 🔧 Cohere API Helper
 async function generateWithCohere(ingredients, lang) {
-  const apiKey = process.env.COHERE_API_KEY;
-
-  if (!apiKey) {
-    console.error("❌ Missing COHERE_API_KEY in environment variables.");
-    return "❌ Cohere API key not found.";
-  }
-
   const prompt = `
 You are a Korean cooking expert.
 

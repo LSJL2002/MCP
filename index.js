@@ -1,15 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import fs from "fs/promises";
-import path from "path";
 
 const server = new McpServer({
   name: "korean-recipe-server",
   version: "3.0.0"
 });
 
-// 🔐 Hardcoded API key (replace with your actual key)
+// 🔐 Replace with your actual API key
 const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
 
 const languageSettings = new Map();
@@ -88,47 +86,12 @@ server.tool(
   }
 );
 
-// Tool: Input Ingredients
+// Tool: Input Ingredients + Generate Recipes (No Save)
 server.tool(
   "input_ingredients",
   { ingredients: z.array(z.string()) },
   async ({ ingredients }, ctx) => {
-    const filePath = path.join("data", `${ctx.sessionId}-ingredients.json`);
-    await fs.mkdir("data", { recursive: true });
-    await fs.writeFile(filePath, JSON.stringify({ ingredients }, null, 2));
-
-    return {
-      content: [{
-        type: "text",
-        text: "✅ Ingredients saved successfully!"
-      }]
-    };
-  }
-);
-
-// Tool: Recipe Recommendation (calls Cohere)
-server.tool(
-  "recipe_rec",
-  {},
-  async (_, ctx) => {
     const lang = languageSettings.get(ctx.sessionId) || "ko";
-    const filePath = path.join("data", `${ctx.sessionId}-ingredients.json`);
-    let fileData;
-
-    try {
-      fileData = JSON.parse(await fs.readFile(filePath, "utf-8"));
-    } catch {
-      return {
-        content: [{
-          type: "text",
-          text: lang === "ko"
-            ? "❌ 저장된 재료가 없습니다. 먼저 재료를 입력해주세요."
-            : "❌ No saved ingredients found. Please input them first."
-        }]
-      };
-    }
-
-    const { ingredients } = fileData;
     const result = await generateWithCohere(ingredients, lang);
 
     return {

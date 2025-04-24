@@ -12,32 +12,7 @@ const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
 
 const languageSettings = new Map();
 
-async function generateWithCohere(ingredients, lang) {
-  const prompt = `
-You are a Korean cooking expert.
-
-Based on these ingredients: ${ingredients.join(", ")}
-
-Suggest 3 Korean recipes. For each, return:
-- name
-- ingredients
-- time (in minutes)
-- difficulty (1–5)
-- steps
-
-Respond in ${lang === "ko" ? "Korean" : "English"}.
-Respond only in valid JSON format like:
-[
-  {
-    "name": "...",
-    "ingredients": [...],
-    "time": "...",
-    "difficulty": ...,
-    "steps": [...]
-  }
-]
-`;
-
+async function callCohere(prompt) {
   try {
     const res = await fetch("https://api.cohere.ai/v1/chat", {
       method: "POST",
@@ -67,6 +42,34 @@ Respond only in valid JSON format like:
   }
 }
 
+async function generateWithCohere(ingredients, lang) {
+  const prompt = `
+You are a Korean cooking expert.
+
+Based on these ingredients: ${ingredients.join(", ")}
+
+Suggest 3 Korean recipes. For each, return:
+- name
+- ingredients
+- time (in minutes)
+- difficulty (1–5)
+- steps
+
+Respond in ${lang === "ko" ? "Korean" : "English"}.
+Respond only in valid JSON format like:
+[
+  {
+    "name": "...",
+    "ingredients": [...],
+    "time": "...",
+    "difficulty": ...,
+    "steps": [...]
+  }
+]
+`;
+  return await callCohere(prompt);
+}
+
 // Tool: Set Language
 server.tool(
   "set_language",
@@ -86,7 +89,7 @@ server.tool(
   }
 );
 
-// Tool: Input Ingredients + Generate Recipes (No Save)
+// Tool: Input Ingredients + Generate Recipes
 server.tool(
   "input_ingredients",
   { ingredients: z.array(z.string()) },
@@ -100,6 +103,39 @@ server.tool(
         text: lang === "ko"
           ? `🍽️ 추천된 레시피:\n${result}`
           : `🍽️ Recommended Recipes:\n${result}`
+      }]
+    };
+  }
+);
+
+// 🔍 Tool: Expand Steps for a Chosen Recipe
+server.tool(
+  "expand_recipe_steps",
+  {
+    name: z.string(),
+    steps: z.array(z.string())
+  },
+  async ({ name, steps }, ctx) => {
+    const lang = languageSettings.get(ctx.sessionId) || "ko";
+    const prompt = `
+You are a Korean cooking expert.
+
+A user selected the recipe "${name}". These are the current steps:
+${steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+
+Please rewrite and expand them into more detailed cooking instructions, one step per item.
+Respond in ${lang === "ko" ? "Korean" : "English"}.
+Only return a numbered list of improved steps.
+`;
+
+    const detailed = await callCohere(prompt);
+
+    return {
+      content: [{
+        type: "text",
+        text: lang === "ko"
+          ? `👩‍🍳 자세한 조리 단계:\n${detailed}`
+          : `👩‍🍳 Detailed Cooking Steps:\n${detailed}`
       }]
     };
   }

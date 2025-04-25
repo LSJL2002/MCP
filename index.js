@@ -14,21 +14,28 @@ const server = new McpServer({
 const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
 const languageSettings = new Map();
 const recipeCache = new Map();
+const allergySettings = new Map();  // 알레르기 재료 저장용
 
-async function generateWithCohere(ingredients, lang) {
+async function generateWithCohere(ingredients, lang, allergies) {
+  // 알레르기 재료가 있으면 제외 문구 추가
+  const allergyClause = allergies && allergies.length > 0
+    ? `\n\nExclude any recipes that include these ingredients: ${allergies.join(", ")}`
+    : "";
+
   const prompt = `
   You are a Korean cooking expert.
-  
+
   Based on these ingredients: ${ingredients.join(", ")}
-  
+  ${allergyClause}
+
   Suggest 3 Korean recipes. For each, return:
   - name
-  - ingredients (list of objects with name and estimated price in KRW try to be realistic as you cannot buy a portion of something. Also When it requires a certain amount of something for example, 2 cups of flour, do not give the cost of 2 cups of flour but the cost of buying a bag of flour.)
+  - ingredients (list of objects with name and estimated price in KRW ... )
   - time (in minutes)
   - difficulty (1–5)
   - steps
-  - total cost (automatically calculated from ingredient prices)
-  
+  - total cost
+
   Respond in ${lang === "ko" ? "Korean" : "English"}.
   Respond only in valid JSON format like:
   [
@@ -36,7 +43,7 @@ async function generateWithCohere(ingredients, lang) {
       "name": "...",
       "ingredients": [
         { "name": "...", "price": 4000 },
-        { "name": "...", "price": 8000 }
+        ...
       ],
       "time": "...",
       "difficulty": ...,
@@ -87,12 +94,34 @@ server.tool(
   }
 );
 
+// 새로 추가된 알레르기 입력 툴
+server.tool(
+  "input_allergy",
+  { allergy: z.string() },
+  async ({ allergy }, ctx) => {
+    const sess = ctx.sessionId;
+    const list = allergySettings.get(sess) || [];
+    list.push(allergy);
+    allergySettings.set(sess, list);
+    return {
+      content: [
+        {
+          type: "text",
+          text: `✅ 알레르기 재료가 추가되었습니다: ${allergy}`
+        }
+      ]
+    };
+  }
+);
+
 server.tool(
   "input_ingredients",
   { ingredients: z.array(z.string()) },
   async ({ ingredients }, ctx) => {
-    const lang = languageSettings.get(ctx.sessionId) || "ko";
-    const raw = await generateWithCohere(ingredients, lang);
+    const sess = ctx.sessionId;
+    const lang = languageSettings.get(sess) || "ko";
+    const allergies = allergySettings.get(sess) || [];
+    const raw = await generateWithCohere(ingredients, lang, allergies);
 
     let parsed;
     try {
@@ -104,11 +133,11 @@ server.tool(
       };
     }
 
-    recipeCache.set(ctx.sessionId, parsed);
+    recipeCache.set(sess, parsed);
 
     const formattedRecipes = parsed.map((r, idx) => {
       return `🍲 레시피 ${idx + 1}: ${r.name}\n` +
-        `🛒 재료: ${r.ingredients.join(", ")}\n` +
+        `🛒 재료: ${r.ingredients.map(i => i.name).join(", ")}\n` +
         `⏱️ 시간: ${r.time} / 난이도: ${r.difficulty}\n`;
     }).join("\n\n");
 
@@ -141,7 +170,6 @@ server.tool(
 
     const idx = parseInt(index, 10) - 1;
     const recipe = recipes[idx];
-
     if (!recipe) {
       return {
         content: [{ type: "text", text: "❌ Invalid recipe number." }]
@@ -177,7 +205,6 @@ server.tool(
 
     const idx = parseInt(index, 10) - 1;
     const recipe = recipes[idx];
-
     if (!recipe) {
       return {
         content: [{ type: "text", text: "❌ Invalid recipe number." }]
@@ -189,19 +216,18 @@ server.tool(
     const fileName = `${recipe.name.replace(/\s+/g, "_")}.txt`;
     const filePath = path.join(folderPath, fileName);
 
-    // Ensure the "Generated Recipes" folder exists
     if (!fs.existsSync(folderPath)) {
       fs.mkdirSync(folderPath);
     }
 
     const fileContent =
-    `Recipe: ${recipe.name}\n` +
-    `Time: ${recipe.time} minutes\n` +
-    `Difficulty: ${recipe.difficulty}/5\n\n` +
-    `Ingredients:\n` +
-    recipe.ingredients.map(i => `- ${i.name} (${i.price}₩)`).join("\n") +
-    `\n\nSteps:\n` +
-    recipe.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
+      `Recipe: ${recipe.name}\n` +
+      `Time: ${recipe.time} minutes\n` +
+      `Difficulty: ${recipe.difficulty}/5\n\n` +
+      `Ingredients:\n` +
+      recipe.ingredients.map(i => `- ${i.name} (${i.price}₩)`).join("\n") +
+      `\n\nSteps:\n` +
+      recipe.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
 
     try {
       fs.writeFileSync(filePath, fileContent);
@@ -221,6 +247,7 @@ server.tool(
     }
   }
 );
+
 // Start the server
 const transport = new StdioServerTransport();
 await server.connect(transport);

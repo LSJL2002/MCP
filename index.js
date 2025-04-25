@@ -185,14 +185,23 @@ server.tool(
     }
 
     const desktopPath = path.join(os.homedir(), "Desktop");
+    const folderPath = path.join(desktopPath, "Generated Recipes");
     const fileName = `${recipe.name.replace(/\s+/g, "_")}.txt`;
-    const filePath = path.join(desktopPath, fileName);
+    const filePath = path.join(folderPath, fileName);
+
+    // Ensure the "Generated Recipes" folder exists
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath);
+    }
 
     const fileContent =
-      `Ingredients:\n` +
-      recipe.ingredients.map(i => `- ${i}`).join("\n") +
-      `\n\nSteps:\n` +
-      recipe.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
+    `Recipe: ${recipe.name}\n` +
+    `Time: ${recipe.time} minutes\n` +
+    `Difficulty: ${recipe.difficulty}/5\n\n` +
+    `Ingredients:\n` +
+    recipe.ingredients.map(i => `- ${i.name} (${i.price}₩)`).join("\n") +
+    `\n\nSteps:\n` +
+    recipe.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
 
     try {
       fs.writeFileSync(filePath, fileContent);
@@ -200,7 +209,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `✅ "${recipe.name}" has been saved to your Desktop as "${fileName}".`
+            text: `✅ "${recipe.name}" has been saved to the "Generated Recipes" folder on your Desktop as "${fileName}".`
           }
         ]
       };
@@ -212,7 +221,6 @@ server.tool(
     }
   }
 );
-
 // Start the server
 const transport = new StdioServerTransport();
 await server.connect(transport);

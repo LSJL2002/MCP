@@ -9,6 +9,10 @@ const server = new McpServer({
   version: "3.0.0"
 });
 
+const languageSettings = new Map();
+const allergySettings  = new Map();
+const cuisineSettings  = new Map();
+
 // 1) 알레르기 등록 툴
 server.tool(
   "food_allergies",
@@ -23,27 +27,43 @@ server.tool(
   }
 );
 
+server.tool(
+  "type_of_food",
+  { cuisine: z.enum(["한식", "중식", "일식", "양식", "기타"]) },
+  async ({ cuisine }, ctx) => {
+    cuisineSettings.set(ctx.sessionId, cuisine);
+    return {
+      content: [
+        {
+          type: "text",
+          text: `✅ 음식 종류가 “${cuisine}”(으)로 설정되었습니다.`
+        }
+      ]
+    };
+  }
+);
+
 // 🔐 Hardcoded API key (replace with your actual key)
 const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
-
-const languageSettings = new Map();
-const allergySettings  = new Map();
 
 server.tool(
   "recipe_rec",
   {},
   async (_, ctx) => {
     const lang = languageSettings.get(ctx.sessionId) || "ko";
+    const allergies   = allergySettings.get(ctx.sessionId)   || [];
+    const cuisineType = cuisineSettings.get(ctx.sessionId)   || "한식";
 
     let { ingredients } = JSON.parse(await fs.readFile(
       path.join("data", `${ctx.sessionId}-ingredients.json`), "utf-8"
     ));
-    const allergies = allergySettings.get(ctx.sessionId) || [];
+
 
     const allergyNote = allergies.length
       ? `\n\n주의: 다음 재료를 포함하지 마세요: ${allergies.join(", ")}`
       : "";
-
+    
+    const cuisineNote = `\n\n요리 종류: ${cuisineType}`;
     const result = await generateWithCoherePrompt(prompt);
 
     return {

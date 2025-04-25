@@ -13,45 +13,50 @@ const server = new McpServer({
 
 const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
 const languageSettings = new Map();
-const recipeCache = new Map();
-const allergySettings = new Map();  // 알레르기 재료 저장용
+const recipeCache      = new Map();
+const allergySettings  = new Map();  // 알레르기 재료 저장용
+const cuisineSettings  = new Map();  // 음식 종류 저장용
 
-async function generateWithCohere(ingredients, lang, allergies) {
-  // 알레르기 재료가 있으면 제외 문구 추가
+// 수정된 generateWithCohere: cuisine 파라미터 추가
+async function generateWithCohere(ingredients, lang, allergies, cuisine) {
   const allergyClause = allergies && allergies.length > 0
     ? `\n\nExclude any recipes that include these ingredients: ${allergies.join(", ")}`
     : "";
 
+  const cuisineClause = cuisine
+    ? `\n\nFocus on ${cuisine} recipes.`
+    : "";
+
   const prompt = `
-  You are a Korean cooking expert.
+You are an expert in ${cuisine || "Korean"} cooking.
 
-  Based on these ingredients: ${ingredients.join(", ")}
-  ${allergyClause}
+Based on these ingredients: ${ingredients.join(", ")}
+${allergyClause}${cuisineClause}
 
-  Suggest 3 Korean recipes. For each, return:
-  - name
-  - ingredients (list of objects with name and estimated price in KRW ... )
-  - time (in minutes)
-  - difficulty (1–5)
-  - steps
-  - total cost
+Suggest 3 recipes. For each, return:
+- name
+- ingredients (list of objects with name and estimated price in KRW)
+- time (in minutes)
+- difficulty (1–5)
+- steps
+- total cost
 
-  Respond in ${lang === "ko" ? "Korean" : "English"}.
-  Respond only in valid JSON format like:
-  [
-    {
-      "name": "...",
-      "ingredients": [
-        { "name": "...", "price": 4000 },
-        ...
-      ],
-      "time": "...",
-      "difficulty": ...,
-      "steps": [...],
-      "total cost": ...
-    }
-  ]
-  `;
+Respond in ${lang === "ko" ? "Korean" : "English"}.
+Respond only in valid JSON format like:
+[
+  {
+    "name": "...",
+    "ingredients": [
+      { "name": "...", "price": 4000 },
+      ...
+    ],
+    "time": "...",
+    "difficulty": ...,
+    "steps": [...],
+    "total cost": ...
+  }
+]
+`;
 
   try {
     const res = await fetch("https://api.cohere.ai/v1/chat", {
@@ -67,7 +72,6 @@ async function generateWithCohere(ingredients, lang, allergies) {
         max_tokens: 1000
       })
     });
-
     const data = await res.json();
     return data.text || data.generations?.[0]?.text || "❌ No valid response from Cohere.";
   } catch (err) {
@@ -82,19 +86,17 @@ server.tool(
   async ({ lang }, ctx) => {
     languageSettings.set(ctx.sessionId, lang);
     return {
-      content: [
-        {
-          type: "text",
-          text: lang === "ko"
-            ? "✅ 언어가 한국어로 설정되었습니다."
-            : "✅ Language has been set to English."
-        }
-      ]
+      content: [{
+        type: "text",
+        text: lang === "ko"
+          ? "✅ 언어가 한국어로 설정되었습니다."
+          : "✅ Language has been set to English."
+      }]
     };
   }
 );
 
-// 새로 추가된 알레르기 입력 툴
+// 알레르기 입력 툴
 server.tool(
   "input_allergy",
   { allergy: z.string() },
@@ -104,12 +106,25 @@ server.tool(
     list.push(allergy);
     allergySettings.set(sess, list);
     return {
-      content: [
-        {
-          type: "text",
-          text: `✅ 알레르기 재료가 추가되었습니다: ${allergy}`
-        }
-      ]
+      content: [{
+        type: "text",
+        text: `✅ 알레르기 재료가 추가되었습니다: ${allergy}`
+      }]
+    };
+  }
+);
+
+// 음식 종류 입력 툴(type_food) 추가
+server.tool(
+  "type_food",
+  { cuisine: z.enum(["한식", "중식", "일식", "양식", "기타"]) },
+  async ({ cuisine }, ctx) => {
+    cuisineSettings.set(ctx.sessionId, cuisine);
+    return {
+      content: [{
+        type: "text",
+        text: `✅ 선호 음식 종류가 “${cuisine}”(으)로 설정되었습니다.`
+      }]
     };
   }
 );
@@ -118,10 +133,12 @@ server.tool(
   "input_ingredients",
   { ingredients: z.array(z.string()) },
   async ({ ingredients }, ctx) => {
-    const sess = ctx.sessionId;
-    const lang = languageSettings.get(sess) || "ko";
-    const allergies = allergySettings.get(sess) || [];
-    const raw = await generateWithCohere(ingredients, lang, allergies);
+    const sess      = ctx.sessionId;
+    const lang      = languageSettings.get(sess) || "ko";
+    const allergies = allergySettings.get(sess)   || [];
+    const cuisine   = cuisineSettings.get(sess)   || "한식";
+
+    const raw = await generateWithCohere(ingredients, lang, allergies, cuisine);
 
     let parsed;
     try {
@@ -137,8 +154,8 @@ server.tool(
 
     const formattedRecipes = parsed.map((r, idx) => {
       return `🍲 레시피 ${idx + 1}: ${r.name}\n` +
-        `🛒 재료: ${r.ingredients.map(i => i.name).join(", ")}\n` +
-        `⏱️ 시간: ${r.time} / 난이도: ${r.difficulty}\n`;
+             `🛒 재료: ${r.ingredients.map(i => i.name).join(", ")}\n` +
+             `⏱️ 시간: ${r.time} / 난이도: ${r.difficulty}\n`;
     }).join("\n\n");
 
     return {
@@ -146,7 +163,7 @@ server.tool(
         {
           type: "text",
           text: "Here are the 3 full recipes (in JSON format):\n\n" +
-            JSON.stringify(parsed, null, 2)
+                JSON.stringify(parsed, null, 2)
         },
         {
           type: "text",
@@ -163,31 +180,23 @@ server.tool(
   async ({ index }, ctx) => {
     const recipes = recipeCache.get(ctx.sessionId);
     if (!recipes) {
-      return {
-        content: [{ type: "text", text: "❌ No recipe data available. Please input ingredients first." }]
-      };
+      return { content: [{ type: "text", text: "❌ No recipe data available. Please input ingredients first." }] };
     }
-
     const idx = parseInt(index, 10) - 1;
     const recipe = recipes[idx];
     if (!recipe) {
-      return {
-        content: [{ type: "text", text: "❌ Invalid recipe number." }]
-      };
+      return { content: [{ type: "text", text: "❌ Invalid recipe number." }] };
     }
-
     return {
-      content: [
-        {
-          type: "text",
-          text:
-            `📋 Recipe: "${recipe.name}"\n` +
-            `💰 Estimated Cost: ${recipe["total cost"] || "Unknown"}\n` +
-            `⏱️ Time: ${recipe.time} / Difficulty: ${recipe.difficulty}\n\n` +
-            `🧑‍🍳 Steps:\n` +
-            recipe.steps.map((s, i) => `  ${i + 1}. ${s}`).join("\n")
-        }
-      ]
+      content: [{
+        type: "text",
+        text:
+          `📋 Recipe: "${recipe.name}"\n` +
+          `💰 Estimated Cost: ${recipe["total cost"] || "Unknown"}\n` +
+          `⏱️ Time: ${recipe.time} / Difficulty: ${recipe.difficulty}\n\n` +
+          `🧑‍🍳 Steps:\n` +
+          recipe.steps.map((s, i) => `  ${i + 1}. ${s}`).join("\n")
+      }]
     };
   }
 );
@@ -198,27 +207,20 @@ server.tool(
   async ({ index }, ctx) => {
     const recipes = recipeCache.get(ctx.sessionId);
     if (!recipes) {
-      return {
-        content: [{ type: "text", text: "❌ No recipe data to save. Please input ingredients first." }]
-      };
+      return { content: [{ type: "text", text: "❌ No recipe data to save. Please input ingredients first." }] };
     }
-
     const idx = parseInt(index, 10) - 1;
     const recipe = recipes[idx];
     if (!recipe) {
-      return {
-        content: [{ type: "text", text: "❌ Invalid recipe number." }]
-      };
+      return { content: [{ type: "text", text: "❌ Invalid recipe number." }] };
     }
 
     const desktopPath = path.join(os.homedir(), "Desktop");
-    const folderPath = path.join(desktopPath, "Generated Recipes");
-    const fileName = `${recipe.name.replace(/\s+/g, "_")}.txt`;
-    const filePath = path.join(folderPath, fileName);
+    const folderPath  = path.join(desktopPath, "Generated Recipes");
+    const fileName    = `${recipe.name.replace(/\s+/g, "_")}.txt`;
+    const filePath    = path.join(folderPath, fileName);
 
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath);
-    }
+    if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath);
 
     const fileContent =
       `Recipe: ${recipe.name}\n` +
@@ -232,18 +234,14 @@ server.tool(
     try {
       fs.writeFileSync(filePath, fileContent);
       return {
-        content: [
-          {
-            type: "text",
-            text: `✅ "${recipe.name}" has been saved to the "Generated Recipes" folder on your Desktop as "${fileName}".`
-          }
-        ]
+        content: [{
+          type: "text",
+          text: `✅ "${recipe.name}" has been saved to your Desktop/Generated Recipes as "${fileName}".`
+        }]
       };
     } catch (err) {
       console.error("❌ File write failed:", err);
-      return {
-        content: [{ type: "text", text: "❌ Failed to save file." }]
-      };
+      return { content: [{ type: "text", text: "❌ Failed to save file." }] };
     }
   }
 );

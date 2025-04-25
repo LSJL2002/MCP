@@ -23,7 +23,7 @@ async function generateWithCohere(ingredients, lang) {
   
   Suggest 3 Korean recipes. For each, return:
   - name
-  - ingredients (list of objects with name and estimated price in KRW)
+  - ingredients (list of objects with name and estimated price in KRW try to be realistic as you cannot buy a portion of something. Also When it requires a certain amount of something for example, 2 cups of flour, do not give the cost of 2 cups of flour but the cost of buying a bag of flour.)
   - time (in minutes)
   - difficulty (1–5)
   - steps
@@ -35,8 +35,8 @@ async function generateWithCohere(ingredients, lang) {
     {
       "name": "...",
       "ingredients": [
-        { "name": "...", "price": 1200 },
-        { "name": "...", "price": 800 }
+        { "name": "...", "price": 4000 },
+        { "name": "...", "price": 8000 }
       ],
       "time": "...",
       "difficulty": ...,

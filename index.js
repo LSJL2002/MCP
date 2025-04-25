@@ -44,18 +44,18 @@ server.tool(
       ? `\n\n주의: 다음 재료를 포함하지 마세요: ${allergies.join(", ")}`
       : "";
 
-      const result = await generateWithCoherePrompt(prompt);
+    const result = await generateWithCoherePrompt(prompt);
 
-      return {
-        content: [{
-          type: "text",
-          text: lang === "ko"
-            ? `🍽️ 추천된 레시피:\n${result}`
-            : `🍽️ Recommended Recipes:\n${result}`
-        }]
-      };
-    }
-  );
+    return {
+      content: [{
+        type: "text",
+        text: lang === "ko"
+          ? `🍽️ 추천된 레시피:\n${result}`
+          : `🍽️ Recommended Recipes:\n${result}`
+      }]
+    };
+  }
+);
 
 async function generateWithCohere(ingredients, lang) {
   const prompt = `

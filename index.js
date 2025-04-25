@@ -27,36 +27,39 @@ async function generateWithCohere(ingredients, lang, allergies, cuisine) {
     ? `\n\nFocus on ${cuisine} recipes.`
     : "";
 
-  const prompt = `
-You are an expert in ${cuisine || "Korean"} cooking.
-
-Based on these ingredients: ${ingredients.join(", ")}
-${allergyClause}${cuisineClause}
-
-Suggest 3 recipes. For each, return:
-- name
-- ingredients (list of objects with name and estimated price in KRW)
-- time (in minutes)
-- difficulty (1–5)
-- steps
-- total cost
-
-Respond in ${lang === "ko" ? "Korean" : "English"}.
-Respond only in valid JSON format like:
-[
-  {
-    "name": "...",
-    "ingredients": [
-      { "name": "...", "price": 4000 },
+    const prompt = `
+    You are an expert in ${cuisine || "Korean"} cooking.
+    
+    Based on these ingredients: ${ingredients.join(", ")}
+    ${allergyClause}${cuisineClause}
+    
+    Suggest 3 recipes in **strict JSON** format only. Do not include explanations or any other text.
+    
+    Each recipe must include:
+    - name (string)
+    - ingredients (array of objects: { name: string, price: number })
+    - time (string, e.g., "30 minutes")
+    - difficulty (integer 1-5)
+    - steps (array of strings)
+    - total cost (number)
+    
+    Respond ONLY with a valid JSON array of 3 objects like:
+    [
+      {
+        "name": "Recipe Name",
+        "ingredients": [
+          { "name": "Eggs", "price": 1000 },
+          ...
+        ],
+        "time": "30 minutes",
+        "difficulty": 2,
+        "steps": ["Step 1...", "Step 2..."],
+        "total cost": 7000
+      },
       ...
-    ],
-    "time": "...",
-    "difficulty": ...,
-    "steps": [...],
-    "total cost": ...
-  }
-]
-`;
+    ]
+    Response language: ${lang === "ko" ? "Korean" : "English"}
+    `.trim();
 
   try {
     const res = await fetch("https://api.cohere.ai/v1/chat", {

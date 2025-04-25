@@ -14,10 +14,10 @@ const server = new McpServer({
 const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
 const languageSettings = new Map();
 const recipeCache      = new Map();
-const allergySettings  = new Map();  // 알레르기 재료 저장용
-const cuisineSettings  = new Map();  // 음식 종류 저장용
+const allergySettings  = new Map(); 
+const cuisineSettings  = new Map();  
 
-// 수정된 generateWithCohere: cuisine 파라미터 추가
+
 async function generateWithCohere(ingredients, lang, allergies, cuisine) {
   const allergyClause = allergies && allergies.length > 0
     ? `\n\nExclude any recipes that include these ingredients: ${allergies.join(", ")}`
@@ -99,7 +99,6 @@ server.tool(
   }
 );
 
-// 알레르기 입력 툴
 server.tool(
   "input_allergy",
   { allergy: z.string() },
@@ -117,7 +116,7 @@ server.tool(
   }
 );
 
-// 음식 종류 입력 툴(type_food) 추가
+
 server.tool(
   "type_food",
   { cuisine: z.enum(["한식", "중식", "일식", "양식", "기타"]) },
@@ -249,6 +248,6 @@ server.tool(
   }
 );
 
-// Start the server
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

@@ -20,8 +20,12 @@
   "homepage": "https://github.com/LSJL2002/MCP#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.2",
+    "cheerio": "^1.0.0",
     "dotenv": "^16.5.0",
+    "node-fetch": "^3.3.2",
+    "puppeteer": "^24.7.2",
     "typescript": "^5.8.3",
+    "undici": "^6.21.2",
     "zod": "^3.24.3"
   }
 }

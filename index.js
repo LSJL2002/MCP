@@ -1,11 +1,11 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import fetch from "node-fetch";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-// Initialize the MCP server
 const server = new McpServer({
   name: "korean-recipe-server",
   version: "3.0.0"
@@ -17,29 +17,34 @@ const recipeCache = new Map();
 
 async function generateWithCohere(ingredients, lang) {
   const prompt = `
-You are a Korean cooking expert.
-
-Based on these ingredients: ${ingredients.join(", ")}
-
-Suggest 3 Korean recipes. For each, return:
-- name
-- ingredients
-- time (in minutes)
-- difficulty (1–5)
-- steps
-
-Respond in ${lang === "ko" ? "Korean" : "English"}.
-Respond only in valid JSON format like:
-[
-  {
-    "name": "...",
-    "ingredients": [...],
-    "time": "...",
-    "difficulty": ...,
-    "steps": [...]
-  }
-]
-`;
+  You are a Korean cooking expert.
+  
+  Based on these ingredients: ${ingredients.join(", ")}
+  
+  Suggest 3 Korean recipes. For each, return:
+  - name
+  - ingredients (list of objects with name and estimated price in KRW)
+  - time (in minutes)
+  - difficulty (1–5)
+  - steps
+  - total cost (automatically calculated from ingredient prices)
+  
+  Respond in ${lang === "ko" ? "Korean" : "English"}.
+  Respond only in valid JSON format like:
+  [
+    {
+      "name": "...",
+      "ingredients": [
+        { "name": "...", "price": 1200 },
+        { "name": "...", "price": 800 }
+      ],
+      "time": "...",
+      "difficulty": ...,
+      "steps": [...],
+      "total cost": ...
+    }
+  ]
+  `;
 
   try {
     const res = await fetch("https://api.cohere.ai/v1/chat", {
@@ -64,7 +69,6 @@ Respond only in valid JSON format like:
   }
 }
 
-// Set language tool
 server.tool(
   "set_language",
   { lang: z.enum(["ko", "en"]) },
@@ -83,7 +87,6 @@ server.tool(
   }
 );
 
-// Input ingredients tool
 server.tool(
   "input_ingredients",
   { ingredients: z.array(z.string()) },
@@ -125,7 +128,6 @@ server.tool(
   }
 );
 
-// Expand recipe tool
 server.tool(
   "expand_recipe",
   { index: z.enum(["1", "2", "3"]) },
@@ -151,7 +153,10 @@ server.tool(
         {
           type: "text",
           text:
-            `📋 Steps for "${recipe.name}":\n\n` +
+            `📋 Recipe: "${recipe.name}"\n` +
+            `💰 Estimated Cost: ${recipe["total cost"] || "Unknown"}\n` +
+            `⏱️ Time: ${recipe.time} / Difficulty: ${recipe.difficulty}\n\n` +
+            `🧑‍🍳 Steps:\n` +
             recipe.steps.map((s, i) => `  ${i + 1}. ${s}`).join("\n")
         }
       ]
@@ -159,7 +164,6 @@ server.tool(
   }
 );
 
-// Save recipe tool
 server.tool(
   "save_recipe",
   { index: z.enum(["1", "2", "3"]) },

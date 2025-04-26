@@ -12,10 +12,39 @@ const server = new McpServer({
 });
 
 const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
+const nutritionixAppId = "c8fc1217";   // ⚡ <-- Put your Nutritionix App ID here
+const nutritionixApiKey = "6c588cadf8429dc79e20448399bd04a2	"; // ⚡ <-- Put your Nutritionix API Key here
+
 const languageSettings = new Map();
 const recipeCache      = new Map();
-const allergySettings  = new Map(); 
-const cuisineSettings  = new Map();  
+const allergySettings  = new Map();
+const cuisineSettings  = new Map();
+
+async function translateToEnglish(text) {
+  try {
+    const res = await fetch("https://api.cohere.ai/v1/chat", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "command-r-plus",
+        message: `Translate the following Korean text into natural English. Respond with only the translated text, no explanations or formatting.\n\n"${text}"`,
+        temperature: 0.3,
+        max_tokens: 1000
+      })
+    });
+
+    const data = await res.json();
+    const translation = data.text || data.generations?.[0]?.text || text;
+    return translation.trim();
+  } catch (err) {
+    console.error("❌ Translation error (Cohere):", err);
+    return text; // fallback if translation fails
+  }
+}
+
 
 
 async function generateWithCohere(ingredients, lang, allergies, cuisine) {
@@ -27,7 +56,7 @@ async function generateWithCohere(ingredients, lang, allergies, cuisine) {
     ? `\n\nFocus on ${cuisine} recipes.`
     : "";
 
-    const prompt = `
+  const prompt = `
     You are an expert in ${cuisine || "Korean"} cooking.
     
     Based on these ingredients: ${ingredients.join(", ")}
@@ -37,7 +66,7 @@ async function generateWithCohere(ingredients, lang, allergies, cuisine) {
     
     Each recipe must include:
     - name (string)
-    - ingredients (array of objects: { name: string, price: number })
+    - ingredients (array of objects: { name: string, price: number }) in English
     - time (string, e.g., "30 minutes")
     - difficulty (integer 1-5)
     - steps (array of strings)
@@ -59,7 +88,7 @@ async function generateWithCohere(ingredients, lang, allergies, cuisine) {
       ...
     ]
     Response language: ${lang === "ko" ? "Korean" : "English"}
-    `.trim();
+  `.trim();
 
   try {
     const res = await fetch("https://api.cohere.ai/v1/chat", {
@@ -115,7 +144,6 @@ server.tool(
     };
   }
 );
-
 
 server.tool(
   "type_food",
@@ -215,7 +243,7 @@ server.tool(
     const recipe = recipes[idx];
     if (!recipe) {
       return { content: [{ type: "text", text: "❌ Invalid recipe number." }] };
-    }  
+    }
 
     const desktopPath = path.join(os.homedir(), "Desktop");
     const folderPath  = path.join(desktopPath, "Generated Recipes");
@@ -248,6 +276,83 @@ server.tool(
   }
 );
 
+// NEW TOOL! GET NUTRITION INFO
+server.tool(
+  "get_nutrition",
+  { index: z.enum(["1", "2", "3"]) },
+  async ({ index }, ctx) => {
+    const recipes = recipeCache.get(ctx.sessionId);
+    if (!recipes) {
+      return { content: [{ type: "text", text: "❌ No recipe data available. Please input ingredients first." }] };
+    }
+    const idx = parseInt(index, 10) - 1;
+    const recipe = recipes[idx];
+    if (!recipe) {
+      return { content: [{ type: "text", text: "❌ Invalid recipe number." }] };
+    }
+
+    let nutritionSummary = "";
+    let totalCalories = 0;
+    let totalProtein = 0;
+    let totalFat = 0;
+    let totalCarbs = 0;
+
+    for (const ingredient of recipe.ingredients) {
+      try {
+        let queryName = ingredient.name;
+        if (/^[가-힣]+$/.test(queryName)) { // if it’s pure Korean characters
+          queryName = await translateToEnglish(queryName);
+          console.log(`🔤 Translated "${ingredient.name}" ➔ "${queryName}"`);
+        }
+        const res = await fetch("https://trackapi.nutritionix.com/v2/natural/nutrients", {
+          method: "POST",
+          headers: {
+            "x-app-id": nutritionixAppId,
+            "x-app-key": nutritionixApiKey,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ query: ingredient.name })
+        });
+
+        const data = await res.json();
+        if (!data.foods || data.foods.length === 0) {
+          nutritionSummary += `❓ "${ingredient.name}": No data found.\n`;
+          continue;
+        }
+
+        const food = data.foods[0];
+        nutritionSummary += 
+          `🍴 ${ingredient.name}:\n` +
+          `- Calories: ${food.nf_calories} kcal\n` +
+          `- Protein: ${food.nf_protein} g\n` +
+          `- Fat: ${food.nf_total_fat} g\n` +
+          `- Carbs: ${food.nf_total_carbohydrate} g\n\n`;
+
+        totalCalories += food.nf_calories || 0;
+        totalProtein  += food.nf_protein || 0;
+        totalFat      += food.nf_total_fat || 0;
+        totalCarbs    += food.nf_total_carbohydrate || 0;
+
+      } catch (err) {
+        console.error("❌ Nutritionix fetch failed:", err);
+        nutritionSummary += `❌ "${ingredient.name}": API error.\n`;
+      }
+    }
+
+    nutritionSummary += `\n🧮 Total for "${recipe.name}":\n` +
+      `- Calories: ${Math.round(totalCalories)} kcal\n` +
+      `- Protein: ${totalProtein.toFixed(1)} g\n` +
+      `- Fat: ${totalFat.toFixed(1)} g\n` +
+      `- Carbs: ${totalCarbs.toFixed(1)} g`;
+
+    return {
+      content: [{
+        type: "text",
+        text: nutritionSummary
+      }]
+    };
+  }
+);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

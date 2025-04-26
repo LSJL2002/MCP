@@ -216,6 +216,16 @@ server.tool(
     if (!recipe) {
       return { content: [{ type: "text", text: "❌ Invalid recipe number." }] };
     }
+    //인분 수 설정
+    server.tool(
+      "set_servings",
+      { servings: z.number().int().positive() },
+      async ({ servings }, ctx) => {
+        servingsSettings.set(ctx.sessionId, servings);
+        return { content: [{ type: "text", text: `✅ 인분 수가 ${servings}인분으로 설정되었습니다.` }] };
+      }
+    );
+    
 
     const desktopPath = path.join(os.homedir(), "Desktop");
     const folderPath  = path.join(desktopPath, "Generated Recipes");

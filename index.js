@@ -11,9 +11,7 @@ const server = new McpServer({
   version: "3.0.0"
 });
 
-const apiKey = "cvSzQEHn2ScRtCVDcyRN5K3ebBvaDubAT4bFA3lL";
-const nutritionixAppId = "c8fc1217";   // ⚡ <-- Put your Nutritionix App ID here
-const nutritionixApiKey = "6c588cadf8429dc79e20448399bd04a2	"; // ⚡ <-- Put your Nutritionix API Key here
+const apiKey = "API KEY HERE";
 
 const languageSettings = new Map();
 const recipeCache      = new Map();

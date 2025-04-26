@@ -33,6 +33,13 @@ To configure Claude Desktop and connect the tools to it, follow these steps:
 
 You can also use other MCP clients like Claude to interact with the server.
 
+## API KEY
+Add your own Cohere API key in the index.js file.
+
+https://docs.cohere.com/cohere-documentation
+
+const apiKey = "ADD API KEY HERE";
+
 ## License
 
 This project is licensed under the MIT License.

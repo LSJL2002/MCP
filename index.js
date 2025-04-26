@@ -11,7 +11,7 @@ const server = new McpServer({
   version: "3.0.0"
 });
 
-const apiKey = "API KEY HERE";
+const apiKey = "ADD API KEY HERE";
 
 const languageSettings = new Map();
 const recipeCache      = new Map();
@@ -34,11 +34,11 @@ async function generateWithCohere(ingredients, lang, allergies, cuisine) {
     Based on these ingredients: ${ingredients.join(", ")}
     ${allergyClause}${cuisineClause}
     
-    Suggest 3 recipes in **strict JSON** format only. Do not include explanations or any other text.
+    Suggest 3 recipes in **strict JSON** format only. Do not include explanations or any other text. In addition to this, when giving the price of the ingredient dont give the price of the required but what a person would have to spend to buy that ingredient in a market (IE: flour--> 1kg of flour around 5000 won)
     
     Each recipe must include:
     - name (string)
-    - ingredients (array of objects: { name: string, price: number }) in English
+    - ingredients (array of objects: { name: string, price: number }) 
     - time (string, e.g., "30 minutes")
     - difficulty (integer 1-5)
     - steps (array of strings)

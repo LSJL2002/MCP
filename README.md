@@ -1,6 +1,30 @@
 # Recipe Server
 
-This is an MCP server that provides tools for generating Korean recipes based on ingredients provided by the user. The server uses the Cohere API to generate the recipes.
+## Introduction
+
+This server provides tools for generating Korean recipes based on ingredients provided by the user. The server uses the Cohere API to generate the recipes.
+
+## Usage
+
+### Running the Server
+
+To run the server, execute the following command in your terminal:
+
+```bash
+node index.js
+```
+
+This will start the MCP server, and it will be ready to receive requests from an MCP client.
+
+### Calling the Server
+
+You can call the server using an MCP client. Here's an example of how to call the `input_ingredients` tool using a CLI:
+
+```bash
+mcp call recipe-server input_ingredients '{"ingredients": ["김치", "돼지고기"]}'
+```
+
+You can also use other MCP clients like Claude to interact with the server.
 
 ## Tools
 
@@ -9,89 +33,87 @@ The server provides the following tools:
 - `set_language`: Sets the language for the recipe generation.
   - Parameters:
     - `lang`: `ko` for Korean, `en` for English.
+  - Example Output:
+    ```json
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "✅ 언어가 한국어로 설정되었습니다."
+        }
+      ]
+    }
+    ```
 - `input_allergy`: Adds an allergy to the list of allergies to exclude from the recipes.
   - Parameters:
     - `allergy`: The allergy to exclude.
+  - Example Output:
+    ```json
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "✅ 알레르기 재료가 추가되었습니다: 땅콩"
+        }
+      ]
+    }
+    ```
 - `type_food`: Sets the preferred cuisine for the recipe generation.
   - Parameters:
     - `cuisine`: `한식` (Korean), `중식` (Chinese), `일식` (Japanese), `양식` (Western), `기타` (Other).
+  - Example Output:
+    ```json
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "✅ 선호 음식 종류가 “한식”(으)로 설정되었습니다."
+        }
+      ]
+    }
+    ```
 - `input_ingredients`: Generates 3 recipes based on the provided ingredients, language, allergies, and cuisine.
   - Parameters:
     - `ingredients`: An array of ingredients.
+  - Example Output:
+    ```json
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "Here are the 3 full recipes (in JSON format):\n\n[{\"name\":\"김치찌개\",\"ingredients\":[{\"name\":\"김치\",\"price\":2000},{\"name\":\"돼지고기\",\"price\":5000},{\"name\":\"두부\",\"price\":1000}],\"time\":\"30 minutes\",\"difficulty\":2,\"steps\":[\"1. 김치를 볶는다.\",\"2. 돼지고기를 넣고 볶는다.\",\"3. 두부와 물을 넣고 끓인다.\"],\"total cost\":8000},{\"name\":\"돼지고기 김치볶음\",\"ingredients\":[{\"name\":\"김치\",\"price\":2000},{\"name\":\"돼지고기\",\"price\":5000},{\"name\":\"양파\",\"price\":500}],\"time\":\"20 minutes\",\"difficulty\":1,\"steps\":[\"1. 김치와 돼지고기를 볶는다.\",\"2. 양파를 넣고 볶는다.\"],\"total cost\":7500},{\"name\":\"김치전\",\"ingredients\":[{\"name\":\"김치\",\"price\":2000},{\"name\":\"부침가루\",\"price\":1000},{\"name\":\"물\",\"price\":0}],\"time\":\"15 minutes\",\"difficulty\":1,\"steps\":[\"1. 김치, 부침가루, 물을 섞는다.\",\"2. 프라이팬에 굽는다.\"],\"total cost\":3000}]"
+        },
+        {
+          "type": "text",
+          "text": "🍲 레시피 1: 김치찌개\\n🛒 재료: 김치, 돼지고기, 두부\\n⏱️ 시간: 30 minutes / 난이도: 2\\n\\n🍲 레시피 2: 돼지고기 김치볶음\\n🛒 재료: 김치, 돼지고기, 양파\\n⏱️ 시간: 20 minutes / 난이도: 1\\n\\n🍲 레시피 3: 김치전\\n🛒 재료: 김치, 부침가루, 물\\n⏱️ 시간: 15 minutes / 난이도: 1\\n\\n(Use `expand_recipe` or `save_recipe` tool for more!)"
+        }
+      ]
+    }
+    ```
 - `expand_recipe`: Expands a recipe to show the steps and estimated cost.
   - Parameters:
     - `index`: The index of the recipe to expand (1, 2, or 3).
+  - Example Output:
+    ```json
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "📋 Recipe: \\"김치찌개\\"\\n💰 Estimated Cost: Unknown\\n⏱️ Time: 30 minutes / Difficulty: 2\\n\\n🧑‍🍳 Steps:\\n  1. 김치를 볶는다.\\n  2. 돼지고기를 넣고 볶는다.\\n  3. 두부와 물을 넣고 끓인다."
+        }
+      ]
+    }
+    ```
 - `save_recipe`: Saves a recipe to the Desktop/Generated Recipes folder.
   - Parameters:
     - `index`: The index of the recipe to save (1, 2, or 3).
-
-## Usage
-
-To use this server, you need to have an MCP client connected to it. You can then use the tools provided by the server to generate recipes.
-
-### Example
-
-1.  Set the language to Korean:
-
+  - Example Output:
     ```json
     {
-      "tool_name": "set_language",
-      "arguments": {
-        "lang": "ko"
-      }
-    }
-    ```
-
-2.  Add an allergy to the list of allergies to exclude:
-
-    ```json
-    {
-      "tool_name": "input_allergy",
-      "arguments": {
-        "allergy": "땅콩"
-      }
-    }
-    ```
-
-3.  Set the preferred cuisine to Korean:
-
-    ```json
-    {
-      "tool_name": "type_food",
-      "arguments": {
-        "cuisine": "한식"
-      }
-    }
-    ```
-
-4.  Generate 3 recipes based on the provided ingredients:
-
-    ```json
-    {
-      "tool_name": "input_ingredients",
-      "arguments": {
-        "ingredients": ["김치", "돼지고기"]
-      }
-    }
-    ```
-
-5.  Expand the first recipe to show the steps and estimated cost:
-
-    ```json
-    {
-      "tool_name": "expand_recipe",
-      "arguments": {
-        "index": "1"
-      }
-    }
-    ```
-
-6.  Save the first recipe to the Desktop/Generated Recipes folder:
-
-    ```json
-    {
-      "tool_name": "save_recipe",
-      "arguments": {
-        "index": "1"
-      }
+      "content": [
+        {
+          "type": "text",
+          "text": "✅ \\"김치찌개\\" has been saved to your Desktop/Generated Recipes as \\"김치찌개.txt\\"."
+        }
+      ]
     }

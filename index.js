@@ -203,59 +203,5 @@ server.tool(
   }
 );
 
-server.tool(
-  "save_recipe",
-  { index: z.enum(["1", "2", "3"]) },
-  async ({ index }, ctx) => {
-    const recipes = recipeCache.get(ctx.sessionId);
-    if (!recipes) {
-      return { content: [{ type: "text", text: "❌ No recipe data to save. Please input ingredients first." }] };
-    }
-    const idx = parseInt(index, 10) - 1;
-    const recipe = recipes[idx];
-    if (!recipe) {
-      return { content: [{ type: "text", text: "❌ Invalid recipe number." }] };
-    }
-    
-    //칼로리/영양 목표
-    server.tool(
-      "set_nutrition",
-      { calories: z.number().positive().optional(), protein: z.number().positive().optional() },
-      async ({ calories, protein }, ctx) => { /* ... */ }
-    );
-    
-
-    const desktopPath = path.join(os.homedir(), "Desktop");
-    const folderPath  = path.join(desktopPath, "Generated Recipes");
-    const fileName    = `${recipe.name.replace(/\s+/g, "_")}.txt`;
-    const filePath    = path.join(folderPath, fileName);
-
-    if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath);
-
-    const fileContent =
-      `Recipe: ${recipe.name}\n` +
-      `Time: ${recipe.time} minutes\n` +
-      `Difficulty: ${recipe.difficulty}/5\n\n` +
-      `Ingredients:\n` +
-      recipe.ingredients.map(i => `- ${i.name} (${i.price}₩)`).join("\n") +
-      `\n\nSteps:\n` +
-      recipe.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
-
-    try {
-      fs.writeFileSync(filePath, fileContent);
-      return {
-        content: [{
-          type: "text",
-          text: `✅ "${recipe.name}" has been saved to your Desktop/Generated Recipes as "${fileName}".`
-        }]
-      };
-    } catch (err) {
-      console.error("❌ File write failed:", err);
-      return { content: [{ type: "text", text: "❌ Failed to save file." }] };
-    }
-  }
-);
-
-
 const transport = new StdioServerTransport();
 await server.connect(transport);

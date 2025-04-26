@@ -38,8 +38,6 @@ You can also use other MCP clients like Claude to interact with the server.
 This project is licensed under the MIT License.
 
 
-## Usage
-
 ### Running the Server
 
 To run the server, execute the following command in your terminal:

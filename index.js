@@ -226,6 +226,13 @@ server.tool(
       }
     );
     
+    //칼로리/영양 목표
+    server.tool(
+      "set_nutrition",
+      { calories: z.number().positive().optional(), protein: z.number().positive().optional() },
+      async ({ calories, protein }, ctx) => { /* ... */ }
+    );
+    
 
     const desktopPath = path.join(os.homedir(), "Desktop");
     const folderPath  = path.join(desktopPath, "Generated Recipes");

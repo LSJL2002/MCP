@@ -233,7 +233,13 @@ server.tool(
       async ({ calories, protein }, ctx) => { /* ... */ }
     );
     
-
+    //식단 유형 필터
+    server.tool(
+      "set_diet",
+      { diet: z.enum(["vegetarian", "vegan", "gluten-free", "none"]) },
+      async ({ diet }, ctx) => { /* ... */ }
+    );
+    
     const desktopPath = path.join(os.homedir(), "Desktop");
     const folderPath  = path.join(desktopPath, "Generated Recipes");
     const fileName    = `${recipe.name.replace(/\s+/g, "_")}.txt`;

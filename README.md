@@ -1,4 +1,4 @@
-# Korean Recipe Server
+# Recipe Server
 
 This is an MCP server that provides tools for generating Korean recipes based on ingredients provided by the user. The server uses the Cohere API to generate the recipes.
 

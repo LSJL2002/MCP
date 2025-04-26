@@ -7,7 +7,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const server = new McpServer({
-  name: "korean-recipe-server",
+  name: "recipe-server",
   version: "3.0.0"
 });
 

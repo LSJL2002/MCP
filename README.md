@@ -4,6 +4,40 @@
 
 This server provides tools for generating Korean recipes based on ingredients provided by the user. The server uses the Cohere API to generate the recipes.
 
+## Installation
+
+To install the server, follow these steps:
+
+1.  Install Node.js and npm.
+2.  Clone this repository.
+3.  Run `npm install` to install the dependencies.
+
+### Configuring Claude Desktop
+
+To configure Claude Desktop and connect the tools to it, follow these steps:
+
+1.  Open Claude Desktop.
+2.  Go to Settings > Preferences > Model Context Protocol.
+3.  You also need to add the following configuration to your `claude_desktop_config.json` file:
+
+```json
+{
+  "recipegenerator": {
+    "command": "node",
+    "args": [
+      "put your directory here"
+    ]
+  }
+}
+```
+
+You can also use other MCP clients like Claude to interact with the server.
+
+## License
+
+This project is licensed under the MIT License.
+
+
 ## Usage
 
 ### Running the Server
@@ -20,11 +54,7 @@ This will start the MCP server, and it will be ready to receive requests from an
 
 You can call the server using an MCP client. Here's an example of how to call the `input_ingredients` tool using a CLI:
 
-```bash
-mcp call recipe-server input_ingredients '{"ingredients": ["김치", "돼지고기"]}'
-```
 
-You can also use other MCP clients like Claude to interact with the server.
 
 ## Tools
 
